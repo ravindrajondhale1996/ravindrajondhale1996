@@ -12,6 +12,7 @@ import argparse
 import json
 import platform
 import sys
+from json import JSONDecodeError
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
@@ -29,7 +30,11 @@ def fetch_model_files(repo: str) -> list[str]:
     url = HF_API_MODEL.format(repo=quote(repo, safe="/"))
     request = Request(url, headers={"User-Agent": "minimax-downloader/1.0"})
     with urlopen(request) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+        body = response.read().decode("utf-8")
+    try:
+        payload = json.loads(body)
+    except JSONDecodeError as exc:
+        raise RuntimeError(f"Failed to parse model metadata for '{repo}'.") from exc
     siblings = payload.get("siblings", [])
     return [entry.get("rfilename", "") for entry in siblings if entry.get("rfilename")]
 
@@ -120,7 +125,11 @@ def main() -> int:
             files = fetch_model_files(args.repo)
             selected = select_q4_file(files)
 
-        url = HF_RESOLVE_FILE.format(repo=args.repo, branch=quote(args.branch), filename=quote(selected))
+        url = HF_RESOLVE_FILE.format(
+            repo=quote(args.repo, safe="/"),
+            branch=quote(args.branch),
+            filename=quote(selected),
+        )
         destination = output_dir / Path(selected).name
 
         print(f"Repository: {args.repo}")
