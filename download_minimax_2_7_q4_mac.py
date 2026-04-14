@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Download a Minimax 2.7 Q4 GGUF model for macOS.
+Download a Minimax Q4 GGUF model for macOS.
 
-By default this script queries a Hugging Face repository, selects the best
+By default this script queries a Hugging Face repository, selects a preferred
 matching Q4 GGUF file, and downloads it to ~/Downloads.
 """
 
@@ -13,13 +13,14 @@ import json
 import platform
 import sys
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 HF_API_MODEL = "https://huggingface.co/api/models/{repo}"
-HF_RESOLVE_FILE = "https://huggingface.co/{repo}/resolve/main/{filename}?download=true"
+HF_RESOLVE_FILE = "https://huggingface.co/{repo}/resolve/{branch}/{filename}?download=true"
 
-# You can override this at runtime with --repo
+# Default candidate repo; override with --repo for the exact model variant you want.
 DEFAULT_REPO = "bartowski/MiniMax-M2-7B-GGUF"
 PREFERRED_Q4_PATTERNS = ("q4_k_m", "q4_0", "q4")
 
@@ -54,7 +55,12 @@ def download_file(url: str, destination: Path) -> None:
     request = Request(url, headers={"User-Agent": "minimax-downloader/1.0"})
     with urlopen(request) as response, destination.open("wb") as output:
         total = response.headers.get("Content-Length")
-        total_size = int(total) if total and total.isdigit() else None
+        try:
+            total_size = int(total) if total is not None else None
+            if total_size is not None and total_size < 0:
+                total_size = None
+        except (TypeError, ValueError):
+            total_size = None
         downloaded = 0
         chunk_size = 1024 * 1024
 
@@ -74,7 +80,7 @@ def download_file(url: str, destination: Path) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Download Minimax 2.7 Q4 GGUF model for macOS."
+        description="Download a Minimax Q4 GGUF model for macOS."
     )
     parser.add_argument(
         "--repo",
@@ -90,6 +96,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--filename",
         default=None,
         help="Optional explicit filename in the repo. If omitted, the script auto-selects a Q4 file.",
+    )
+    parser.add_argument(
+        "--branch",
+        default="main",
+        help="Repository branch/ref to download from (default: main)",
     )
     return parser
 
@@ -109,7 +120,7 @@ def main() -> int:
             files = fetch_model_files(args.repo)
             selected = select_q4_file(files)
 
-        url = HF_RESOLVE_FILE.format(repo=args.repo, filename=quote(selected))
+        url = HF_RESOLVE_FILE.format(repo=args.repo, branch=quote(args.branch), filename=quote(selected))
         destination = output_dir / Path(selected).name
 
         print(f"Repository: {args.repo}")
@@ -120,7 +131,13 @@ def main() -> int:
         download_file(url, destination)
         print("Download complete.")
         return 0
-    except Exception as exc:  # pragma: no cover - simple CLI script
+    except HTTPError as exc:
+        print(f"Download failed (HTTP {exc.code}): {exc.reason}", file=sys.stderr)
+        return 1
+    except URLError as exc:
+        print(f"Download failed (network error): {exc.reason}", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError) as exc:
         print(f"Download failed: {exc}", file=sys.stderr)
         return 1
 
