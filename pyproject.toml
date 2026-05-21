@@ -1,0 +1,23 @@
+[project]
+name = "real-estate-forecasting"
+version = "0.1.0"
+description = "Demand forecasting for real estate pricing using regression models."
+readme = "README.md"
+authors = [
+    {name = "copilot-swe-agent[bot]",email = "198982749+Copilot@users.noreply.github.com"}
+]
+requires-python = ">=3.12"
+dependencies = [
+    "pandas (>=3.0.3,<4.0.0)",
+    "numpy (>=2.4.6,<3.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "matplotlib (>=3.10.9,<4.0.0)"
+]
+
+[project.scripts]
+run-forecasting = "real_estate_forecasting.pipeline:main"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
