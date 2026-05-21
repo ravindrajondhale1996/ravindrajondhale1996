@@ -245,7 +245,7 @@ def train_models(df: pd.DataFrame, config: PipelineConfig) -> dict:
             "f1": float(f1_score(y_class_test, y_class_pred)),
         },
         "regression": {
-            "rmse": float(mean_squared_error(y_reg_test, y_reg_pred, squared=False)),
+            "rmse": float(np.sqrt(mean_squared_error(y_reg_test, y_reg_pred))),
         },
     }
 
